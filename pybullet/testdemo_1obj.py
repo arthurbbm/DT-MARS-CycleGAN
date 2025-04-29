@@ -23,13 +23,14 @@ def mask_find_multi_bboxs(mask):
 
 
 class World(object):
-    def __init__(self, plant):
-        # self.server_id = p.connect(p.GUI)
-        self.server_id = p.connect(p.DIRECT)
+    def __init__(self, object_mesh_path):
+        self.server_id = p.connect(p.GUI)
+        # self.server_id = p.connect(p.DIRECT)
         p.setAdditionalSearchPath(pybullet_data.getDataPath())
         p.setGravity(0, 0, -10)
         self.plane_id = p.loadURDF("plane.urdf")
         base_position = [0,0,0.05]
+        base_position = [0, 0, -40]
 
         """
         change the object urdf file, choose from below
@@ -41,17 +42,65 @@ class World(object):
 
         To adjust the plant object size, go to urdf file and change 'scale'
         """
-
-        plant = plant
         
         # self.object_id = p.loadURDF('./weedbot_simulation/weedbot_description/urdf/weedbot.urdf', basePosition=base_position) # weedbot robot car
-        self.object_id = p.loadURDF('./weedbot_simulation/simulation_world/urdf/{}.urdf'.format(plant), basePosition=base_position) # weeds
+        # self.object_id = p.loadURDF('./weedbot_simulation/simulation_world/urdf/{}.urdf'.format(plant), basePosition=base_position) # weeds
+
+        self.object_id = self.load_plant_mesh(object_mesh_path, base_position, scale=[0.0004, 0.0004, 0.0004], mass=0.0)
+        self.rotate_object(euler_angles=[0, 0, 0])
 
         # multi objs
         # self.object_ids = []
         # for _ in range(3):
         #     object_id = p.loadURDF('./weedbot_simulation/simulation_world/urdf/{}.urdf'.format(plant), basePosition=base_position)
         #     self.object_ids.append(object_id)
+
+    def load_plant_mesh(self, mesh_path, base_position, scale=[1, 1, 1], mass=0.0):
+        """
+        Loads an arbitrary STL mesh into the simulation with separate
+        visual and (convex hull) collision shapes.
+
+        :param mesh_path:    Path to the .stl or .obj mesh file
+        :param base_position: [x,y,z] world position
+        :param scale:        [sx,sy,sz] mesh scaling factors
+        :param mass:         Mass of the object (0 = static)
+        :returns:            body unique ID
+        """
+        # Create convex collision shape
+        col_shape = p.createCollisionShape(
+            shapeType=p.GEOM_MESH,
+            fileName=mesh_path,
+            meshScale=scale
+        )
+        # Create full-detail visual shape
+        vis_shape = p.createVisualShape(
+            shapeType=p.GEOM_MESH,
+            fileName=mesh_path,
+            meshScale=scale
+        )
+        # Combine into a single rigid body
+        body_id = p.createMultiBody(
+            baseMass=mass,
+            baseCollisionShapeIndex=col_shape,
+            baseVisualShapeIndex=vis_shape,
+            basePosition=base_position
+        )
+        return body_id
+
+    def rotate_object(self, euler_angles=None):
+        """
+        Rotates the loaded object. If euler_angles is None, applies a random yaw.
+        :param euler_angles: [roll, pitch, yaw] in radians
+        """
+        # Get current position
+        pos, _ = p.getBasePositionAndOrientation(self.object_id)
+        # Determine rotation
+        if euler_angles is None:
+            yaw = random.uniform(0, 2 * math.pi)
+            euler_angles = [0, 0, yaw]
+        quat = p.getQuaternionFromEuler(euler_angles)
+        # Reset orientation while keeping position
+        p.resetBasePositionAndOrientation(self.object_id, pos, quat)
 
     def close(self):
         p.disconnect(self.server_id)
@@ -70,9 +119,10 @@ class World(object):
 
     def reset_object(self):
         base_position = [random.random(),random.random(),0.05]
-        p.resetBasePositionAndOrientation(self.object_id, base_position,[0,0,0,1])
+        p.resetBasePositionAndOrientation(self.object_id, base_position,[math.pi/2,0,0,1])
         # change color of object to green like
         alpha = np.random.uniform(0.4, 0.8)
+        alpha = 0.9
         green = np.random.uniform(0.4, 0.8)
         coneColor = [0, green, 0, alpha]
         p.changeVisualShape(self.object_id, -1, rgbaColor=coneColor)
@@ -97,7 +147,8 @@ class World(object):
     def get_image(self, base_position):
         # adjust camera hight and distance here
         r = 0.8 + 0.4*random.random() # distance
-        t = 2 * math.pi * random.random()
+        # t = 2 * math.pi * random.random()
+        t = 0
         h = 0.8 + 0.4 * random.random() # hight
         camera_pos = [base_position[0] + r*math.sin(t), base_position[1] + r*math.cos(t), base_position[2]+h]
 
@@ -145,9 +196,9 @@ class World(object):
 if __name__ == '__main__':
 
     plants = ['big_plant', 'small_plant', 'polygonum_v2', 'cirsium'] # 800 800 400 400
-    plant = 'big_plant'
+    plant_mesh_file = 'soybean.stl'
 
-    env = World(plant=plant)
+    env = World(plant=plant_mesh_file)
     bbox = []
     for i in range(800):
         rgb, seg, gt_bbox = env.step()
@@ -167,19 +218,34 @@ if __name__ == '__main__':
         end_point = (int(gt_bbox[0,2]*w), int(gt_bbox[0,3]*h))
         # cv2.rectangle(rgb, start_point, end_point, color, thickness) # add red bbox in image
 
-        cv2.imshow('show_image', rgb)
-        img_path = 'images/{}_{:04d}.jpg'.format(plant, i)
+        # cv2.imshow('show_image', rgb)
+        # make sure seg3 is uint8
+        seg3 = np.stack([seg, seg, seg], axis=2).astype(np.uint8)
+
+        # stack RGB | SEG
+        vis = np.hstack((rgb, seg3))
+
+        cv2.imshow('RGB (left) | Seg (right)', vis)
+        if cv2.waitKey(1) & 0xFF == 27:
+            break
+
+        img_path = 'images/{}_{:04d}.jpg'.format(plant_mesh_file, i)
         if not os.path.exists(os.path.dirname(img_path)):
             os.makedirs(os.path.dirname(img_path))
-        # cv2.imwrite(img_path, rgb)
+        cv2.imwrite(img_path, rgb)
         cv2.waitKey(1)
         # time.sleep(0.1)
 
         label_path = img_path.replace('images', 'labels').replace('.jpg', '.txt')
-        # if not os.path.exists(os.path.dirname(label_path)):
-        #     os.makedirs(os.path.dirname(label_path))
-        # with open(label_path, 'w') as f:
-        #     f.write("0 {} {} {} {}\n".format(centerX, centerY, width, height))
+        if not os.path.exists(os.path.dirname(label_path)):
+            os.makedirs(os.path.dirname(label_path))
+        with open(label_path, 'w') as f:
+            f.write("0 {} {} {} {}\n".format(centerX, centerY, width, height))
+
+        vis_dir = 'seg_visualization'
+        os.makedirs(vis_dir, exist_ok=True)
+        vis_path = os.path.join(vis_dir, f'{plant_mesh_file}_{i:04d}.jpg')
+        cv2.imwrite(vis_path, vis)
 
         if cv2.waitKey(1) == 27:
             break
