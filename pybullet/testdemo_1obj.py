@@ -10,6 +10,7 @@ from glob import glob
 import pandas as pd
 import os
 from scipy import ndimage
+import yaml
 
 
 def mask_find_bboxs(mask):
@@ -23,14 +24,15 @@ def mask_find_multi_bboxs(mask):
 
 
 class World(object):
-    def __init__(self, object_mesh_path):
-        self.server_id = p.connect(p.GUI)
-        # self.server_id = p.connect(p.DIRECT)
+    def __init__(self, object_mesh_path, soil_directory):
+        self.soil_dir = soil_directory
+        # self.server_id = p.connect(p.GUI)
+        self.server_id = p.connect(p.DIRECT)
         p.setAdditionalSearchPath(pybullet_data.getDataPath())
         p.setGravity(0, 0, -10)
         self.plane_id = p.loadURDF("plane.urdf")
         base_position = [0,0,0.05]
-        base_position = [0, 0, -40]
+        # base_position = [0, 0, -40]
 
         """
         change the object urdf file, choose from below
@@ -45,8 +47,8 @@ class World(object):
         
         # self.object_id = p.loadURDF('./weedbot_simulation/weedbot_description/urdf/weedbot.urdf', basePosition=base_position) # weedbot robot car
         # self.object_id = p.loadURDF('./weedbot_simulation/simulation_world/urdf/{}.urdf'.format(plant), basePosition=base_position) # weeds
-
-        self.object_id = self.load_plant_mesh(object_mesh_path, base_position, scale=[0.0004, 0.0004, 0.0004], mass=0.0)
+        assert os.path.exists(object_mesh_path), "File does not exist: {}".format(object_mesh_path)
+        self.object_id = self.load_plant_mesh(object_mesh_path, base_position, scale=[0.04, 0.04, 0.04], mass=0.0)
         self.rotate_object(euler_angles=[0, 0, 0])
 
         # multi objs
@@ -106,7 +108,7 @@ class World(object):
         p.disconnect(self.server_id)
 
     def change_plane(self):
-        texture_list = glob('./soil_resized/*.jpg')
+        texture_list = glob('{}/*.jpg'.format(self.soil_dir))
         texture_path = np.random.choice(texture_list)
         texture_id = p.loadTexture(texture_path)
         p.changeVisualShape(self.plane_id, -1, textureUniqueId=texture_id)
@@ -119,7 +121,8 @@ class World(object):
 
     def reset_object(self):
         base_position = [random.random(),random.random(),0.05]
-        p.resetBasePositionAndOrientation(self.object_id, base_position,[math.pi/2,0,0,1])
+        # p.resetBasePositionAndOrientation(self.object_id, base_position,[math.pi/2,0,0,1])
+        p.resetBasePositionAndOrientation(self.object_id, base_position,[0,0,0,1])
         # change color of object to green like
         alpha = np.random.uniform(0.4, 0.8)
         alpha = 0.9
@@ -195,10 +198,20 @@ class World(object):
 
 if __name__ == '__main__':
 
+    
     plants = ['big_plant', 'small_plant', 'polygonum_v2', 'cirsium'] # 800 800 400 400
-    plant_mesh_file = 'soybean.stl'
+    
+    with open("../config.yml", "r") as f:
+        config = yaml.safe_load(f)
 
-    env = World(plant=plant_mesh_file)
+    dataset_path = os.path.expanduser(config["pybullet_dataset"])
+
+    output_dir = os.path.join(dataset_path, "output")
+    input_dir = os.path.join(dataset_path, "input")
+    plant_mesh_file = os.path.join(input_dir, "weedbot_simulation", "STLs", "cirsium_v1.STL")
+    soil_dir = os.path.join(input_dir, "soil_resized")
+    env = World(object_mesh_path=plant_mesh_file, soil_directory=soil_dir)
+    plant_mesh_file = os.path.splitext(os.path.basename(plant_mesh_file))[0]
     bbox = []
     for i in range(800):
         rgb, seg, gt_bbox = env.step()
@@ -223,32 +236,33 @@ if __name__ == '__main__':
         seg3 = np.stack([seg, seg, seg], axis=2).astype(np.uint8)
 
         # stack RGB | SEG
-        vis = np.hstack((rgb, seg3))
+        # vis = np.hstack((rgb, seg3))
 
-        cv2.imshow('RGB (left) | Seg (right)', vis)
-        if cv2.waitKey(1) & 0xFF == 27:
-            break
+        # cv2.imshow('RGB (left) | Seg (right)', vis)
+        # if cv2.waitKey(1) & 0xFF == 27:
+            # break
 
         img_path = 'images/{}_{:04d}.jpg'.format(plant_mesh_file, i)
+        img_path = os.path.join(output_dir, img_path)
         if not os.path.exists(os.path.dirname(img_path)):
             os.makedirs(os.path.dirname(img_path))
         cv2.imwrite(img_path, rgb)
-        cv2.waitKey(1)
-        # time.sleep(0.1)
 
-        label_path = img_path.replace('images', 'labels').replace('.jpg', '.txt')
+        label_path = 'labels/{}_{:04d}.txt'.format(plant_mesh_file, i)
+        label_path = os.path.join(output_dir, label_path)
         if not os.path.exists(os.path.dirname(label_path)):
             os.makedirs(os.path.dirname(label_path))
         with open(label_path, 'w') as f:
             f.write("0 {} {} {} {}\n".format(centerX, centerY, width, height))
 
-        vis_dir = 'seg_visualization'
-        os.makedirs(vis_dir, exist_ok=True)
-        vis_path = os.path.join(vis_dir, f'{plant_mesh_file}_{i:04d}.jpg')
-        cv2.imwrite(vis_path, vis)
+        segmentation_path = 'segmentation/{}_{:04d}.jpg'.format(plant_mesh_file, i)
+        segmentation_path = os.path.join(output_dir, segmentation_path)
+        if not os.path.exists(os.path.dirname(segmentation_path)):
+            os.makedirs(os.path.dirname(segmentation_path))
+        cv2.imwrite(segmentation_path, seg3)
 
-        if cv2.waitKey(1) == 27:
-            break
+        # if cv2.waitKey(1) == 27:
+            # break
 
     # df = pd.DataFrame(bbox)
     # df.to_csv('bbox/{}_bbox.csv'.format(plant), index=False)
