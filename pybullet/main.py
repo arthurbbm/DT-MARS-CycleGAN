@@ -20,6 +20,8 @@ class World:
         p.setGravity(0, 0, -10)
         self.plane_id = p.loadURDF("plane.urdf")
         self.objects = []  # list of (body_id, class_id)
+        textures = glob(os.path.join(self.soil_dir, '*.jpg'))
+        self.texture_ids = [p.loadTexture(t) for t in textures]
 
     def _load_mesh(self, mesh_path, scale=[1,1,1], mass=0.0):
         col = p.createCollisionShape(p.GEOM_MESH, fileName=mesh_path, meshScale=scale)
@@ -40,8 +42,7 @@ class World:
             self.objects.append((body_id, itm['class_id']))
 
     def change_plane_texture(self):
-        textures = glob(os.path.join(self.soil_dir, '*.jpg'))
-        tex_id = p.loadTexture(random.choice(textures))
+        tex_id = random.choice(self.texture_ids)
         p.changeVisualShape(self.plane_id, -1, textureUniqueId=tex_id)
 
     def randomize_objects_pose(self):
