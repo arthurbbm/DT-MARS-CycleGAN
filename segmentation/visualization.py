@@ -46,6 +46,6 @@ with open("../config.yml", "r") as f:
     config = yaml.safe_load(f)
 dataset_root = os.path.expanduser(config["segmentation_dataset"])
 
-test_image_dir = os.path.join(dataset_root, 'test')
+test_image_dir = os.path.join(dataset_root, 'train', 'images')
 test_output_dir = os.path.join(dataset_root, 'test_predictions')
-visualize_predictions(test_image_dir, test_output_dir, num_to_show=5, alpha=0.6)
+visualize_predictions(test_image_dir, test_output_dir, num_to_show=20, alpha=0.6)
