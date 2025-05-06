@@ -1,6 +1,7 @@
 import glob
 import random
 import os
+import yaml
 import numpy as np
 import torch
 
@@ -95,8 +96,10 @@ if __name__ == "__main__":
     import matplotlib.pyplot as plt
     from torchvision import transforms
 
+
     # Initialize the dataset
-    root = "/home/myid/zw63397/Projects/Crop_Detect/data"  # replace with your dataset root directory
+    root = "/home/abhhn/data/DT-MARS-CycleGAN/dataset"
+    # root = "/home/myid/zw63397/Projects/Crop_Detect/data"  # replace with your dataset root directory
     transforms_ = transforms.Compose([
         transforms.Resize((224, 224)),
         transforms.ToTensor(),
