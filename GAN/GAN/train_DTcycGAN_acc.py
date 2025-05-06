@@ -221,11 +221,23 @@ def train(opt, accelerator):
         if (epoch+1)%10 == 0 and accelerator.is_main_process:
             if not os.path.exists(opt.outdir):
                 os.makedirs(opt.outdir)
-            accelerator.save(netG_A2B.module.state_dict(), '{}/netG_dt_A2B_withdet_{}.pth'.format(opt.outdir, epoch+1))
-            accelerator.save(netG_B2A.module.state_dict(), '{}/netG_dt_B2A_withdet_{}.pth'.format(opt.outdir, epoch+1))
-            accelerator.save(netD_A.module.state_dict(), '{}/netD_dt_A_withdet_{}.pth'.format(opt.outdir, epoch+1))
-            accelerator.save(netD_B.module.state_dict(), '{}/netD__dt_B_withdet_{}.pth'.format(opt.outdir, epoch+1))
-            accelerator.save(netDet.module.state_dict(), '{}/netDet_{}.pth'.format(opt.outdir, epoch+1))
+
+            # helper to unwrap or fall back
+            def save_wrapped(model, name):
+                m = accelerator.unwrap_model(model)
+                accelerator.save(m.state_dict(),
+                                 f"{opt.outdir}/{name}_{epoch + 1}.pth")
+
+            save_wrapped(netG_A2B, "netG_dt_A2B_withdet")
+            save_wrapped(netG_B2A, "netG_dt_B2A_withdet")
+            save_wrapped(netD_A, "netD_dt_A_withdet")
+            save_wrapped(netD_B, "netD_dt_B_withdet")
+            save_wrapped(netDet, "netDet")
+            # accelerator.save(netG_A2B.module.state_dict(), '{}/netG_dt_A2B_withdet_{}.pth'.format(opt.outdir, epoch+1))
+            # accelerator.save(netG_B2A.module.state_dict(), '{}/netG_dt_B2A_withdet_{}.pth'.format(opt.outdir, epoch+1))
+            # accelerator.save(netD_A.module.state_dict(), '{}/netD_dt_A_withdet_{}.pth'.format(opt.outdir, epoch+1))
+            # accelerator.save(netD_B.module.state_dict(), '{}/netD__dt_B_withdet_{}.pth'.format(opt.outdir, epoch+1))
+            # accelerator.save(netDet.module.state_dict(), '{}/netDet_{}.pth'.format(opt.outdir, epoch+1))
 
 
 def main():
