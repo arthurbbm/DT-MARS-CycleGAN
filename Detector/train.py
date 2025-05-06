@@ -7,7 +7,7 @@ from loss import DetLossBatch
 from tqdm import tqdm
 
 # Configuration
-data_dir = '/home/myid/zw63397/Projects/Crop_Detect/data/sim_data'  # Update this path
+data_dir = '/home/abhhn/data/DT-MARS-CycleGAN/dataset/sim/sim_data'  # Update this path
 num_epochs = 50
 batch_size = 256
 learning_rate = 1e-4
