@@ -42,8 +42,10 @@ def train(opt, accelerator):
     netD_B.apply(weights_init_normal)
 
     netDet = DetLineModel() # vit_small_patch16_224
-    netDet.load_state_dict(torch.load('/home/myid/zw63397/Projects/Crop_Detect/DT/Detector/models/box/best_model_46_0.0105.pth',\
+    netDet.load_state_dict(torch.load('/home/abhhn/DT-MARS-CycleGAN/weights/best_model.pt',\
                                       map_location=torch.device('cpu')))
+    # netDet.load_state_dict(torch.load('/home/myid/zw63397/Projects/Crop_Detect/DT/Detector/models/box/best_model_46_0.0105.pth',\
+    #                                   map_location=torch.device('cpu')))
 
     # Lossess
     criterion_GAN = torch.nn.MSELoss()
@@ -231,8 +233,9 @@ def main():
     parser.add_argument('--epoch', type=int, default=0, help='starting epoch')
     parser.add_argument('--n_epochs', type=int, default=200, help='number of epochs of training')
     parser.add_argument('--batchSize', type=int, default=8, help='size of the batches')
-    parser.add_argument('--dataroot', type=str, default='/home/myid/zw63397/Projects/Crop_Detect/data', help='root directory of the dataset')
-    parser.add_argument('--outdir', type=str, default='/home/myid/zw63397/Projects/Crop_Detect/DT/GAN/output', help='output dir')
+    # parser.add_argument('--dataroot', type=str, default='/home/myid/zw63397/Projects/Crop_Detect/data', help='root directory of the dataset')
+    parser.add_argument('--dataroot', type=str, default='/home/abhhn/data/DT-MARS-CycleGAN/dataset', help='root directory of the dataset')
+    parser.add_argument('--outdir', type=str, default='/home/abhhn/data/DT-MARS-CycleGAN/dataset/output', help='output dir')
     parser.add_argument('--lr', type=float, default=0.0002, help='initial learning rate')
     parser.add_argument('--decay_epoch', type=int, default=100, help='epoch to start linearly decaying the learning rate to 0')
     parser.add_argument('--input_nc', type=int, default=3, help='number of channels of input data')
