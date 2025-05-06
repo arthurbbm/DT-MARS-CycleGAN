@@ -42,7 +42,7 @@ def train(opt, accelerator):
     netD_B.apply(weights_init_normal)
 
     netDet = DetLineModel() # vit_small_patch16_224
-    netDet.load_state_dict(torch.load('/home/myid/zw63397/Projects/Crop_Detect/DT/Detector/models/box/best_model_46_0.0105.pth',\
+    netDet.load_state_dict(torch.load('/home/abhhn/DT-MARS-CycleGAN/Detector/models/box/det_model_44_0.0100.pth',\
                                       map_location=torch.device('cpu')))
 
     # Lossess
@@ -200,13 +200,24 @@ def train(opt, accelerator):
         lr_scheduler_D_B.step()
 
         # Save models checkpoints
-        if (epoch+1)%10 == 0 and accelerator.is_main_process:
+        if (epoch+1)%2 == 0 and accelerator.is_main_process:
             if not os.path.exists(opt.outdir):
                 os.makedirs(opt.outdir)
-            accelerator.save(netG_A2B.module.state_dict(), '{}/netG_retina_A2B_withdet_{}.pth'.format(opt.outdir, epoch+1))
-            accelerator.save(netG_B2A.module.state_dict(), '{}/netG_retina_B2A_withdet_{}.pth'.format(opt.outdir, epoch+1))
-            accelerator.save(netD_A.module.state_dict(), '{}/netD_retina_A_withdet_{}.pth'.format(opt.outdir, epoch+1))
-            accelerator.save(netD_B.module.state_dict(), '{}/netD__retina_B_withdet_{}.pth'.format(opt.outdir, epoch+1))
+
+            def save_wrapped(model, name):
+                m = accelerator.unwrap_model(model)
+                accelerator.save(m.state_dict(),
+                                 f"{opt.outdir}/{name}_{epoch + 1}.pth")
+
+            save_wrapped(netG_A2B, "netG_retina_A2B_withdet_")
+            save_wrapped(netG_B2A, "netG_retina_B2A_withdet_")
+            save_wrapped(netD_A, "netD_retina_A_withdet_")
+            save_wrapped(netD_B, "netD_retina_B_withdet_")
+            save_wrapped(netDet, "netDet_retina")
+            # accelerator.save(netG_A2B.module.state_dict(), '{}/netG_retina_A2B_withdet_{}.pth'.format(opt.outdir, epoch+1))
+            # accelerator.save(netG_B2A.module.state_dict(), '{}/netG_retina_B2A_withdet_{}.pth'.format(opt.outdir, epoch+1))
+            # accelerator.save(netD_A.module.state_dict(), '{}/netD_retina_A_withdet_{}.pth'.format(opt.outdir, epoch+1))
+            # accelerator.save(netD_B.module.state_dict(), '{}/netD_retina_B_withdet_{}.pth'.format(opt.outdir, epoch+1))
 
 
 def main():
@@ -214,8 +225,8 @@ def main():
     parser.add_argument('--epoch', type=int, default=0, help='starting epoch')
     parser.add_argument('--n_epochs', type=int, default=200, help='number of epochs of training')
     parser.add_argument('--batchSize', type=int, default=8, help='size of the batches')
-    parser.add_argument('--dataroot', type=str, default='/home/myid/zw63397/Projects/Crop_Detect/data', help='root directory of the dataset')
-    parser.add_argument('--outdir', type=str, default='/home/myid/zw63397/Projects/Crop_Detect/DT/GAN/output', help='output dir')
+    parser.add_argument('--dataroot', type=str, default='/home/abhhn/data/DT-MARS-CycleGAN/dataset', help='root directory of the dataset')
+    parser.add_argument('--outdir', type=str, default='/home/abhhn/data/DT-MARS-CycleGAN/dataset/output', help='output dir')
     parser.add_argument('--lr', type=float, default=0.0002, help='initial learning rate')
     parser.add_argument('--decay_epoch', type=int, default=100, help='epoch to start linearly decaying the learning rate to 0')
     parser.add_argument('--input_nc', type=int, default=3, help='number of channels of input data')
