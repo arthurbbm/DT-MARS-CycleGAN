@@ -213,7 +213,7 @@ def train(opt, accelerator):
             save_wrapped(netG_B2A, "netG_retina_B2A_withdet_")
             save_wrapped(netD_A, "netD_retina_A_withdet_")
             save_wrapped(netD_B, "netD_retina_B_withdet_")
-            save_wrapped(netDet, "netDet")
+            save_wrapped(netDet, "netDet_retina")
             # accelerator.save(netG_A2B.module.state_dict(), '{}/netG_retina_A2B_withdet_{}.pth'.format(opt.outdir, epoch+1))
             # accelerator.save(netG_B2A.module.state_dict(), '{}/netG_retina_B2A_withdet_{}.pth'.format(opt.outdir, epoch+1))
             # accelerator.save(netD_A.module.state_dict(), '{}/netD_retina_A_withdet_{}.pth'.format(opt.outdir, epoch+1))
