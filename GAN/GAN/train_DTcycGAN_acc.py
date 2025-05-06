@@ -42,25 +42,10 @@ def train(opt, accelerator):
     netD_B.apply(weights_init_normal)
 
     netDet = DetLineModel() # vit_small_patch16_224
-    # netDet.load_state_dict(torch.load('/home/abhhn/DT-MARS-CycleGAN/weight/best.pt',\
-    #                                   map_location=torch.device('cpu')))
+    netDet.load_state_dict(torch.load('/home/abhhn/DT-MARS-CycleGAN/weight/best.pt',\
+                                      map_location=torch.device('cpu')))
     # netDet.load_state_dict(torch.load('/home/myid/zw63397/Projects/Crop_Detect/DT/Detector/models/box/best_model_46_0.0105.pth',\
     #                                   map_location=torch.device('cpu')))
-    # 1) Load the checkpoint bundle
-    checkpoint_path = "/home/abhhn/DT-MARS-CycleGAN/weight/best.pt"
-    ckpt = torch.load(checkpoint_path, map_location=device)
-
-    # 2) Pull out the ultralytics “model” sub‐dict if present
-    if isinstance(ckpt, dict) and 'model' in ckpt:
-        sd = ckpt['model']  # yolov8 .pt bundles store weights here
-    else:
-        sd = ckpt  # otherwise assume it's a raw state_dict
-
-    # 3) Load into your network, allowing missing/unexpected keys
-    missing, unexpected = netDet.load_state_dict(sd, strict=False)
-
-    print(f"Loaded DetLineModel — missing keys: {missing}\n"
-          f"                        unexpected keys: {unexpected}")
 
     # Lossess
     criterion_GAN = torch.nn.MSELoss()
