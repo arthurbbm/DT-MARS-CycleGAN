@@ -14,14 +14,14 @@ from datasets import ImageDataset, CropDataset
 
 parser = argparse.ArgumentParser()
 parser.add_argument('--batchSize', type=int, default=1, help='size of the batches')
-parser.add_argument('--dataroot', type=str, default='/home/myid/zw63397/Projects/Crop_Detect/data', help='root directory of the dataset')
-parser.add_argument('--img_outfolder', type=str, default='sim2real/cycle', help='output img dir')
+parser.add_argument('--dataroot', type=str, default='/home/abhhn/data/DT-MARS-CycleGAN/dataset', help='root directory of the dataset')
+parser.add_argument('--img_outfolder', type=str, default='/home/abhhn/data/DT-MARS-CycleGAN/dataset/sim2real/cycle', help='output img dir')
 parser.add_argument('--input_nc', type=int, default=3, help='number of channels of input data')
 parser.add_argument('--output_nc', type=int, default=3, help='number of channels of output data')
 parser.add_argument('--cuda', action='store_true', help='use GPU computation')
 parser.add_argument('--n_cpu', type=int, default=8, help='number of cpu threads to use during batch generation')
-parser.add_argument('--generator_A2B', type=str, default='/home/myid/zw63397/Projects/Crop_Detect/DT/GAN/output/netG_retina_A2B_withdet_200.pth', help='A2B generator checkpoint file')
-parser.add_argument('--generator_B2A', type=str, default='/home/myid/zw63397/Projects/Crop_Detect/DT/GAN/output/netG_retina_B2A_withdet_200.pth', help='B2A generator checkpoint file')
+parser.add_argument('--generator_A2B', type=str, default='/home/abhhn/DT-MARS-CycleGAN/GAN/GAN/output/netG_retina_A2B_withdet_200.pth', help='A2B generator checkpoint file')
+parser.add_argument('--generator_B2A', type=str, default='/home/abhhn/DT-MARS-CycleGAN/GAN/GAN/output/netG_retina_B2A_withdet_200.pth', help='B2A generator checkpoint file')
 opt = parser.parse_args()
 opt.size = (640, 640)
 print(opt)
@@ -63,7 +63,7 @@ dataloader = DataLoader(CropDataset(opt.dataroot, transforms_=transforms_, rate=
                         batch_size=opt.batchSize, shuffle=False, num_workers=opt.n_cpu)
 ###################################
 
-path_name = os.path.join('/home/myid/zw63397/Projects/Crop_Detect/data', opt.img_outfolder, 'images')
+path_name = os.path.join('/home/abhhn/data/DT-MARS-CycleGAN/dataset', opt.img_outfolder, 'images')
 if not os.path.exists(path_name):
     os.makedirs(path_name)
 
