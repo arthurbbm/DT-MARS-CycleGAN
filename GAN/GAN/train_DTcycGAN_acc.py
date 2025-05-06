@@ -42,7 +42,7 @@ def train(opt, accelerator):
     netD_B.apply(weights_init_normal)
 
     netDet = DetLineModel() # vit_small_patch16_224
-    netDet.load_state_dict(torch.load('/home/abhhn/DT-MARS-CycleGAN/weight/best_model.pt',\
+    netDet.load_state_dict(torch.load('/home/abhhn/DT-MARS-CycleGAN/weight/best.pt',\
                                       map_location=torch.device('cpu')))
     # netDet.load_state_dict(torch.load('/home/myid/zw63397/Projects/Crop_Detect/DT/Detector/models/box/best_model_46_0.0105.pth',\
     #                                   map_location=torch.device('cpu')))
