@@ -1,3 +1,4 @@
+import os
 import torch
 from torch.utils.data import DataLoader
 from torchvision import transforms
@@ -86,6 +87,7 @@ for epoch in range(num_epochs):
     # Save the model
     if val_loss < best_val_loss:
         best_val_loss = val_loss
+        os.makedirs('models/box', exist_ok=True)
         model_save_path = 'models/box/det_model_{}_{:.4f}.pth'.format(epoch+1, best_val_loss)
         torch.save(model.state_dict(), model_save_path)
         print(f'Best model saved to {model_save_path}')
