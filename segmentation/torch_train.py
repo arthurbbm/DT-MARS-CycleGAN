@@ -9,6 +9,7 @@ Usage:
         --batchSize 4 \
         --dataroot /path/to/dataset \
         --outdir /path/to/save/model \
+        --checkpoint_freq 5 \
         --lr 1e-4 \
         --num_labels 5 \
         [--device cuda]
@@ -71,7 +72,7 @@ def main():
         device = torch.device(args.device)
     else:
         device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-    print(f"Using device: {device}")
+    print(f"Using device: {device}", flush=True)
 
     # dirs
     image_dir = os.path.join(args.dataroot, 'images')
@@ -127,7 +128,7 @@ def main():
             optimizer.step()
             running_loss += loss.item() * imgs.size(0)
         avg_loss = running_loss / len(train_loader.dataset)
-        print(f"Epoch {epoch:2d}/{args.n_epochs}  train loss: {avg_loss:.4f}")
+        print(f"Epoch {epoch:2d}/{args.n_epochs}  train loss: {avg_loss:.4f}", flush=True)
 
         if epoch % args.checkpoint_freq == 0:
             # save checkpoint
@@ -138,13 +139,13 @@ def main():
                 'optimizer_state_dict': optimizer.state_dict(),
                 'loss': avg_loss
             }, os.path.join(args.outdir, 'checkpoint.pth'))
-            print(f"🔖 Saved checkpoint of epoch {epoch}/{args.n_epochs} to checkpoint.pth")
+            print(f"🔖 Saved checkpoint of epoch {epoch}/{args.n_epochs} to checkpoint.pth", flush=True)
 
     # save final state_dict
     os.makedirs(args.outdir, exist_ok=True)
     pth_path = os.path.join(args.outdir, 'segmentation_model.pth')
     torch.save(model.state_dict(), pth_path)
-    print(f"✅ Saved state_dict to {pth_path}")
+    print(f"✅ Saved state_dict to {pth_path}", flush=True)
 
 if __name__ == '__main__':
     main()
