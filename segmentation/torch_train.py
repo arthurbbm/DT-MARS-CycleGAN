@@ -31,6 +31,7 @@ def parse_args():
     p.add_argument('--batchSize', type=int, default=4)
     p.add_argument('--dataroot',  type=str, required=True)
     p.add_argument('--outdir',    type=str, default='./fine_tuned_model')
+    p.add_argument('--checkpoint_freq', type=int, default=5)
     p.add_argument('--lr',        type=float, default=1e-4)
     p.add_argument('--num_labels', type=int, default=5)
     p.add_argument('--device', choices=['cpu','cuda','mps'], default=None)
@@ -128,7 +129,16 @@ def main():
         avg_loss = running_loss / len(train_loader.dataset)
         print(f"Epoch {epoch:2d}/{args.n_epochs}  train loss: {avg_loss:.4f}")
 
-        # you can add a quick eval pass here if desired...
+        if epoch % args.checkpoint_freq == 0:
+            # save checkpoint
+            os.makedirs(args.outdir, exist_ok=True)
+            torch.save({
+                'epoch': epoch,
+                'model_state_dict': model.state_dict(),
+                'optimizer_state_dict': optimizer.state_dict(),
+                'loss': avg_loss
+            }, os.path.join(args.outdir, 'checkpoint.pth'))
+            print(f"🔖 Saved checkpoint of epoch {epoch}/{args.n_epochs} to checkpoint.pth")
 
     # save final state_dict
     os.makedirs(args.outdir, exist_ok=True)
