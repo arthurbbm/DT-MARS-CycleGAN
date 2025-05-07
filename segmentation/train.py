@@ -410,13 +410,3 @@ if __name__ == '__main__':
         ckpt = os.path.join(args.outdir, f"epoch_{epoch:02d}.pth")
         torch.save(model.state_dict(), ckpt)
 
-
-python train.py \
-  --n_epochs 10 \
-  --batchSize 4 \
-  --dataroot /home/abhhn/data/DT-MARS-CycleGAN/pybullet_dataset/output \
-  --outdir ./fine_tuned_model \
-  --lr 5e-5 \
-  --num_labels 5 \
-  --device cuda
-
