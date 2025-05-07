@@ -258,8 +258,8 @@ def main():
     print(f"Using device: {device}")
 
     # data dirs
-    image_dir = os.path.join(args.dataroot, 'train', 'images')
-    mask_dir  = os.path.join(args.dataroot, 'train', 'masks')
+    image_dir = os.path.join(args.dataroot, 'images')
+    mask_dir  = os.path.join(args.dataroot, 'masks')
 
     # augmentations
     train_transforms = transforms.Compose([
