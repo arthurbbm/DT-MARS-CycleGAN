@@ -1,12 +1,13 @@
 #!/usr/bin/env python3
 """
-Inference script for semantic segmentation using a fine-tuned Transformers model.
+Inference script for semantic segmentation using a model trained with EdgeSegModel.
 Usage:
     python inference.py \
-        --model_name_or_dir facebook/detr-resnet-50-panoptic \
-        --model_path path/to/fine_tuned_model.pth \
+        --model_path path/to/segmentation_model.pth \
+        --num_labels 5 \
         --test_dir  path/to/test/images \
         --output_dir path/to/save/masks \
+        [--size 513] \
         [--device {cpu,cuda,mps}]
 """
 import os
@@ -14,37 +15,97 @@ import argparse
 import numpy as np
 from PIL import Image
 import torch
-from transformers import AutoImageProcessor, AutoModelForSemanticSegmentation
+import torch.nn.functional as F
+from torch import nn
+from torchvision import transforms
+
+# --- copy these from your training script ---
+class UNetDecoder(nn.Module):
+    def __init__(self, encoder_channels, decoder_channels):
+        super().__init__()
+        assert len(decoder_channels) == len(encoder_channels) - 1
+        layers = []
+        in_ch = encoder_channels[0]
+        for skip_ch, out_ch in zip(encoder_channels[1:], decoder_channels):
+            layers.append(nn.Sequential(
+                nn.Upsample(scale_factor=2, mode='bilinear', align_corners=False),
+                nn.Conv2d(in_ch + skip_ch, out_ch, kernel_size=3, padding=1),
+                nn.BatchNorm2d(out_ch),
+                nn.ReLU(inplace=True),
+            ))
+            in_ch = out_ch
+        self.blocks = nn.ModuleList(layers)
+
+    def forward(self, feats):
+        x = feats[0]
+        for block, skip in zip(self.blocks, feats[1:]):
+            x = F.interpolate(x, size=skip.shape[-2:], mode='bilinear', align_corners=False)
+            x = torch.cat([x, skip], dim=1)
+            x = block(x)
+        return x
+
+class EdgeSegModel(nn.Module):
+    def __init__(self, num_labels):
+        super().__init__()
+        from qai_hub_models.models.deeplabv3_resnet50 import Model as QaiModel
+        wrapper = QaiModel.from_pretrained()
+        self.seg_model = wrapper.model  # torchvision DeepLabV3 backbone+head
+
+        # replace classifier to match num_labels
+        old = self.seg_model.classifier[-1]
+        self.seg_model.classifier[-1] = nn.Conv2d(old.in_channels, num_labels, kernel_size=1)
+
+        # UNet decoder on backbone features
+        enc_ch = [2048, 1024, 512, 256]
+        dec_ch = [256, 128, 64]
+        self.decoder = UNetDecoder(enc_ch, dec_ch)
+        self.dec_head = nn.Conv2d(dec_ch[-1], num_labels, kernel_size=1)
+
+        # edge head (unused in this script)
+        self.edge_head = nn.Conv2d(512, 1, kernel_size=1)
+
+    def forward(self, x):
+        seg_out = self.seg_model(x)['out']
+        body = self.seg_model.backbone
+        c1 = body.relu(body.bn1(body.conv1(x)))
+        c1 = body.maxpool(c1)
+        c2 = body.layer1(c1)
+        c3 = body.layer2(c2)
+        c4 = body.layer3(c3)
+        c5 = body.layer4(c4)
+
+        feats = [c5, c4, c3, c2]
+        x_dec = self.decoder(feats)
+        dec_logits = self.dec_head(x_dec)
+        dec_logits = F.interpolate(dec_logits, size=x.shape[-2:], mode='bilinear', align_corners=False)
+
+        # combine
+        seg_logits = seg_out + dec_logits
+        # edge_logits = ...
+        return seg_logits, None
+# --- end copied classes ---
 
 def parse_args():
     parser = argparse.ArgumentParser(description="Semantic segmentation inference script")
-    parser.add_argument(
-        '--model_name_or_dir', required=True,
-        help="Name or path of the base pretrained model (for architecture & processor)"
-    )
-    parser.add_argument(
-        '--model_path', required=True,
-        help="Path to the .pth file containing your fine‑tuned model weights"
-    )
-    parser.add_argument(
-        '--test_dir', required=True,
-        help="Directory with test images (*.jpg, *.png)"
-    )
-    parser.add_argument(
-        '--output_dir', required=True,
-        help="Where to save predicted mask images"
-    )
-    parser.add_argument(
-        '--device', default=None, choices=['cpu', 'cuda', 'mps'],
-        help="Compute device. Default auto-detects"
-    )
+    parser.add_argument('--model_path', required=True,
+                        help="Path to the .pth file containing your trained model.state_dict()")
+    parser.add_argument('--num_labels', type=int, required=True,
+                        help="Number of segmentation classes used in training")
+    parser.add_argument('--test_dir', required=True,
+                        help="Directory with test images (*.jpg, *.png)")
+    parser.add_argument('--output_dir', required=True,
+                        help="Where to save predicted mask images")
+    parser.add_argument('--size', type=int, default=513,
+                        help="Resize shorter edge to this for inference (default: 513)")
+    parser.add_argument('--device', choices=['cpu','cuda','mps'], default=None,
+                        help="Compute device. Default auto-detects")
     return parser.parse_args()
 
 def main():
     args = parse_args()
     os.makedirs(args.output_dir, exist_ok=True)
 
-    # Device selection
+    # device
     if args.device:
         device = torch.device(args.device)
     else:
@@ -56,46 +117,43 @@ def main():
             device = torch.device('cpu')
     print(f"Using device: {device}")
 
-    # Load processor & instantiate model architecture
-    processor = AutoImageProcessor.from_pretrained(args.model_name_or_dir)
-    model = AutoModelForSemanticSegmentation.from_pretrained(
-        args.model_name_or_dir,
-        ignore_mismatched_sizes=True  # allows loading when num_labels differs
-    )
-
-    # Load fine‑tuned weights
+    # load model
+    model = EdgeSegModel(args.num_labels)
     state_dict = torch.load(args.model_path, map_location=device)
     model.load_state_dict(state_dict)
-    model.to(device)
-    model.eval()
+    model.to(device).eval()
 
-    # Inference over test images
+    # preprocess
+    tf = transforms.Compose([
+        transforms.Resize(args.size, interpolation=Image.BILINEAR),
+        transforms.ToTensor(),
+        transforms.Normalize([0.485,0.456,0.406], [0.229,0.224,0.225]),
+    ])
+
+    # inference
     for fname in sorted(os.listdir(args.test_dir)):
-        if not fname.lower().endswith(('.jpg', '.png')):
+        if not fname.lower().endswith(('.jpg','.png')):
             continue
         img_path = os.path.join(args.test_dir, fname)
-        image = Image.open(img_path).convert('RGB')
+        img = Image.open(img_path).convert('RGB')
+        orig_w, orig_h = img.size
 
-        # Preprocess
-        enc = processor(images=image, return_tensors='pt')
-        pixel_values = enc['pixel_values'].to(device)
-
-        # Forward
+        x = tf(img).unsqueeze(0).to(device)
         with torch.no_grad():
-            outputs = model(pixel_values=pixel_values)
-            seg = processor.post_process_semantic_segmentation(
-                outputs, target_sizes=[image.size[::-1]]
-            )[0]
+            seg_logits, _ = model(x)
+            # upsample to original size
+            seg_logits = F.interpolate(seg_logits, size=(orig_h, orig_w),
+                                       mode='bilinear', align_corners=False)
+            mask = seg_logits.argmax(dim=1)[0].cpu().numpy().astype(np.uint8)
 
-        # Convert to mask and save
-        mask_np = seg.cpu().numpy().astype(np.uint8)
-        mask_img = Image.fromarray(mask_np, mode='L')
+        mask_img = Image.fromarray(mask, mode='L')
         out_name = os.path.splitext(fname)[0] + '_mask.png'
         mask_img.save(os.path.join(args.output_dir, out_name))
         print(f"Saved mask: {out_name}")
 
 if __name__ == '__main__':
     main()
+
 
 
 
