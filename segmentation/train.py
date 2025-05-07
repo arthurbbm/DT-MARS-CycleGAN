@@ -407,6 +407,9 @@ if __name__ == '__main__':
     for epoch in range(1, args.n_epochs+1):
         avg_loss = train_epoch(model, loader, optimizer, loss_fn, device)
         print(f"Epoch {epoch}/{args.n_epochs} — loss: {avg_loss:.4f}")
-        ckpt = os.path.join(args.outdir, f"epoch_{epoch:02d}.pth")
+        ckpt = os.path.join(args.outdir,'checkpoint.pth')
         torch.save(model.state_dict(), ckpt)
+
+    seg_model = os.path.join(args.outdir,'segmentation_model.pth')
+    os.rename(ckpt, seg_model)
 
