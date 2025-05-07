@@ -22,6 +22,7 @@ from torch import nn, optim
 from torch.utils.data import DataLoader, Dataset
 from torchvision import transforms
 from torchvision.models.segmentation import deeplabv3_resnet50
+from torchvision.models import ResNet50_Weights
 from torchvision.models.segmentation.deeplabv3 import DeepLabHead
 
 def parse_args():
@@ -94,7 +95,8 @@ def main():
                               collate_fn=collate_fn, pin_memory=True)
 
     # model: torchvision DeepLabV3 with ResNet50 backbone
-    model = deeplabv3_resnet50(pretrained_backbone=True, pretrained=True,
+    model = deeplabv3_resnet50(weights=None,
+                               weights_backbone=ResNet50_Weights.IMAGENET1K_V2,
                                progress=True, num_classes=args.num_labels)
 
     model.classifier = DeepLabHead(2048, args.num_labels)
