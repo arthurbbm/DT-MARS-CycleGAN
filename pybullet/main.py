@@ -76,9 +76,12 @@ class World:
         rgb = np.array(rgb)[:, :, :3][:, :, ::-1]
         seg = np.array(seg, dtype=np.int32)
         # build class mask: initialize 0 background
-        mask = np.zeros_like(seg, dtype=np.uint8)
-        for body_id, class_id in self.objects:
-            mask[seg == body_id] = class_id
+        # mask = np.zeros_like(seg, dtype=np.uint8)
+        # for body_id, class_id in self.objects:
+        #     mask[seg == body_id] = class_id
+
+        mask = (seg > 0).astype(np.uint8)
+
         return rgb, mask
 
     def close(self):
@@ -124,3 +127,4 @@ if __name__ == '__main__':
         Image.fromarray(rgb).save(os.path.join(output,'images',f'{i:04d}.png'))
         Image.fromarray(mask,mode='L').save(os.path.join(output,'masks',f'{i:04d}.png'))
     world.close()
+
