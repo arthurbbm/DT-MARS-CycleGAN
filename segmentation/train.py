@@ -246,7 +246,7 @@ def parse_args():
 def main():
     args = parse_args()
 
-    # device
+    # device (Trainer will move batches automatically)
     if args.device:
         device = torch.device(args.device)
     else:
@@ -276,24 +276,24 @@ def main():
         num_labels=args.num_labels
     ).to(device)
 
-    # prepare examples
+    # prepare examples — keep everything on CPU!
     examples = get_image_mask_pairs(image_dir, mask_dir)
     encodings = []
     for ex in examples:
         aug_img = train_transforms(ex['image'])
         enc = processor(images=aug_img, return_tensors='pt')
-        pixel_values = enc['pixel_values'].squeeze(0).to(device)
+        pixel_values = enc['pixel_values'].squeeze(0)     # CPU tensor
         _, H, W = pixel_values.shape
         mask_rs = ex['mask'].resize((W, H), resample=Image.NEAREST)
-        labels = torch.tensor(np.array(mask_rs), dtype=torch.long).to(device)
+        labels = torch.tensor(np.array(mask_rs), dtype=torch.long)  # CPU tensor
         encodings.append({'pixel_values': pixel_values, 'labels': labels})
 
-    # split
+    # split into train/eval
     split = int(0.8 * len(encodings))
     train_ds = SegDataset(encodings[:split])
     eval_ds  = SegDataset(encodings[split:])
 
-    # trainer args
+    # training arguments — disable pin_memory
     training_args = TrainingArguments(
         output_dir=args.outdir,
         num_train_epochs=args.n_epochs,
@@ -305,7 +305,8 @@ def main():
         logging_dir=args.logging_dir,
         logging_steps=args.logging_steps,
         do_train=True,
-        do_eval=False
+        do_eval=False,
+        dataloader_pin_memory=False,
     )
 
     trainer = Trainer(
@@ -313,12 +314,13 @@ def main():
         args=training_args,
         train_dataset=train_ds,
         eval_dataset=eval_ds,
-        tokenizer=processor  # HF will use this to collate / log
+        tokenizer=processor
     )
 
     # train
     trainer.train()
-    # instead of HF's `save_model`, dump a single .pth
+
+    # finally: save a single .pth as before
     os.makedirs(args.outdir, exist_ok=True)
     pth_path = os.path.join(args.outdir, 'segmentation_model.pth')
     torch.save(model.state_dict(), pth_path)
@@ -326,6 +328,7 @@ def main():
 
 if __name__ == '__main__':
     main()
+
 
 
 
