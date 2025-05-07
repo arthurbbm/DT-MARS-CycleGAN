@@ -397,8 +397,8 @@ if __name__ == '__main__':
     optimizer = torch.optim.Adam(model.parameters(), lr=args.lr)
     loss_fn   = CombinedLoss()
 
-    train_img_dir = os.path.join(args.dataroot, 'train', 'images')
-    train_msk_dir = os.path.join(args.dataroot, 'train', 'masks')
+    train_img_dir = os.path.join(args.dataroot, 'images')
+    train_msk_dir = os.path.join(args.dataroot, 'masks')
     dataset = SegDataset(train_img_dir, train_msk_dir, size=513)
     loader  = DataLoader(dataset, batch_size=args.batchSize, shuffle=True,
                          num_workers=4, pin_memory=True)
@@ -409,3 +409,14 @@ if __name__ == '__main__':
         print(f"Epoch {epoch}/{args.n_epochs} — loss: {avg_loss:.4f}")
         ckpt = os.path.join(args.outdir, f"epoch_{epoch:02d}.pth")
         torch.save(model.state_dict(), ckpt)
+
+
+python train.py \
+  --n_epochs 10 \
+  --batchSize 4 \
+  --dataroot /home/abhhn/data/DT-MARS-CycleGAN/pybullet_dataset/output \
+  --outdir ./fine_tuned_model \
+  --lr 5e-5 \
+  --num_labels 5 \
+  --device cuda
+
