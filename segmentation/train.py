@@ -183,7 +183,7 @@
 #!/usr/bin/env python3
 """
 Training-only script for semantic segmentation using HuggingFace Transformers,
-but saving a single `segmentation_model.pth` state_dict at the end.
+with a safe hue jitter implementation to avoid uint8 overflow.
 Usage:
     python train.py \
         --n_epochs 10 \
@@ -201,12 +201,33 @@ import numpy as np
 from PIL import Image
 import torch
 from torchvision import transforms
+from torchvision.transforms import ColorJitter
 from transformers import (
     AutoImageProcessor,
     AutoModelForSemanticSegmentation,
     TrainingArguments,
     Trainer
 )
+
+# --- Safe hue adjustment to avoid uint8 overflow bug in older torchvision ---
+from PIL import Image as PILImage
+
+def safe_adjust_hue(img: PILImage.Image, hue_factor: float) -> PILImage.Image:
+    if not (-0.5 <= hue_factor <= 0.5):
+        raise ValueError(f"hue_factor {hue_factor} out of range [-0.5, 0.5]")
+    hsv = img.convert("HSV")
+    h, s, v = hsv.split()
+    shift = int(hue_factor * 255)
+    # build LUT that wraps around 0..255
+    lut = [((i + shift) % 256) for i in range(256)]
+    h = h.point(lut)
+    hsv = PILImage.merge("HSV", (h, s, v))
+    return hsv.convert(img.mode)
+
+class SafeColorJitter(ColorJitter):
+    def adjust_hue(self, img, hue_factor):
+        return safe_adjust_hue(img, hue_factor)
+# --- end safe hue jitter ---
 
 def get_image_mask_pairs(image_dir, mask_dir):
     image_files = sorted([f for f in os.listdir(image_dir) if f.lower().endswith(('.jpg', '.png'))])
@@ -258,12 +279,12 @@ def main():
     print(f"Using device: {device}")
 
     # data dirs
-    image_dir = os.path.join(args.dataroot, 'images')
-    mask_dir  = os.path.join(args.dataroot, 'masks')
+    image_dir = os.path.join(args.dataroot, 'train', 'images')
+    mask_dir  = os.path.join(args.dataroot, 'train', 'masks')
 
-    # augmentations
+    # augmentations with SafeColorJitter
     train_transforms = transforms.Compose([
-        transforms.RandomApply([transforms.ColorJitter(0.4,0.4,0.4,0.1)], p=0.8),
+        transforms.RandomApply([SafeColorJitter(0.4, 0.4, 0.4, 0.1)], p=0.8),
         transforms.RandomApply([transforms.GaussianBlur(kernel_size=5)], p=0.5)
     ])
 
@@ -313,12 +334,13 @@ def main():
         args=training_args,
         train_dataset=train_ds,
         eval_dataset=eval_ds,
-        tokenizer=processor  # HF will use this to collate / log
+        tokenizer=processor
     )
 
     # train
     trainer.train()
-    # instead of HF's `save_model`, dump a single .pth
+
+    # save a single .pth as before
     os.makedirs(args.outdir, exist_ok=True)
     pth_path = os.path.join(args.outdir, 'segmentation_model.pth')
     torch.save(model.state_dict(), pth_path)
@@ -326,6 +348,7 @@ def main():
 
 if __name__ == '__main__':
     main()
+
 
 
 
