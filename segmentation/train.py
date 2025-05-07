@@ -263,7 +263,7 @@ def main():
 
     # augmentations
     train_transforms = transforms.Compose([
-        transforms.RandomApply([transforms.ColorJitter(0.4,0.4,0.4,0.1)], p=0),
+        transforms.RandomApply([transforms.ColorJitter(0.4,0.4,0.4,0.1)], p=0.8),
         transforms.RandomApply([transforms.GaussianBlur(kernel_size=5)], p=0.5)
     ])
 
